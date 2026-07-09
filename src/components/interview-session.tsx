@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import ScoreCard from "@/components/ScoreCard";
+import InterviewReport from "@/components/InterviewReport";
 import {
   clearInterviewSessionCache,
   formatCachedTime,
@@ -10,6 +10,7 @@ import {
   saveInterviewSessionCache,
 } from "@/lib/cache/analysis-cache";
 import { getInterviewQuestions } from "@/lib/data/interview-questions";
+import { buildInterviewReport } from "@/lib/report/build-report";
 import type { InterviewScoreResult, ScoredInterviewItem } from "@/lib/types/score";
 
 type ScoringState = "idle" | "loading" | "done" | "error";
@@ -320,37 +321,11 @@ export default function InterviewSession() {
         )}
 
         {scoringState === "done" && averageScore !== null && (
-          <div className="mt-8 space-y-5">
-            <div>
-              <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
-                评分报告
-              </p>
-              <ScoreCard
-                title="综合评分"
-                score={averageScore}
-                maxScore={10}
-                summary="基于全部题目的平均得分（含未作答题，未作答按 0 分计），由 AI 严格依据回答与题目的关联性及实际内容评分。"
-                variant="hero"
-              />
-            </div>
-
-            <div className="space-y-4">
-              {scoredItems.map((item) => (
-                <ScoreCard
-                  key={`${item.index}-${item.question}`}
-                  title={`第 ${item.index + 1} 题`}
-                  score={item.score}
-                  maxScore={10}
-                  summary={item.question}
-                  answerPreview={
-                    item.answer.trim() ? item.answer : "（未作答）"
-                  }
-                  strengths={item.strengths}
-                  weaknesses={item.weaknesses}
-                  suggestions={item.suggestions}
-                />
-              ))}
-            </div>
+          <div className="mt-8">
+            <InterviewReport
+              report={buildInterviewReport(averageScore, scoredItems)}
+              items={scoredItems}
+            />
           </div>
         )}
       </section>
