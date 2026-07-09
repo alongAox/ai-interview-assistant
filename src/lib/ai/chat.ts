@@ -1,12 +1,15 @@
 import { requireAIClient } from "@/lib/ai/client";
 
-export async function callAIJson<T>(prompt: string): Promise<T> {
+export async function callAIJson<T>(
+  prompt: string,
+  options?: { temperature?: number },
+): Promise<T> {
   const ai = requireAIClient();
 
   const completion = await ai.client.chat.completions.create({
     model: ai.model,
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.3,
+    temperature: options?.temperature ?? 0.3,
     response_format: { type: "json_object" },
   });
 

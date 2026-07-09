@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  clearInterviewSessionCache,
+  clearWorkflowCache,
+  formatCachedTime,
+  getWorkflowCache,
+  saveWorkflowCache,
+} from "@/lib/cache/analysis-cache";
 import { saveInterviewQuestions } from "@/lib/data/interview-questions";
 import {
   ANALYSIS_SECTIONS,
@@ -88,12 +95,41 @@ function UploadIcon() {
 export default function InterviewAnalyzer() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [cachedFileName, setCachedFileName] = useState<string | null>(null);
+  const [cachedFileSize, setCachedFileSize] = useState<number | null>(null);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState("");
   const [result, setResult] = useState<WorkflowResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
   const loading = step === "analyzing" || step === "generating";
+
+  useEffect(() => {
+    const cache = getWorkflowCache();
+    if (!cache) {
+      return;
+    }
+
+    setResult({
+      fileName: cache.fileName,
+      analysis: cache.analysis,
+      questions: cache.questions,
+    });
+    setCachedFileName(cache.fileName);
+    setCachedFileSize(cache.fileSize);
+    setCachedAt(cache.cachedAt);
+    setStep("done");
+    saveInterviewQuestions(cache.questions);
+  }, []);
+
+  function clearCachedState() {
+    clearWorkflowCache();
+    clearInterviewSessionCache();
+    setCachedFileName(null);
+    setCachedFileSize(null);
+    setCachedAt(null);
+  }
 
   function selectFile(selected: File | undefined) {
     if (!selected) {
@@ -104,6 +140,7 @@ export default function InterviewAnalyzer() {
       setError("请上传 PDF 格式的文件");
       setFile(null);
       setResult(null);
+      clearCachedState();
       return;
     }
 
@@ -111,6 +148,7 @@ export default function InterviewAnalyzer() {
     setFile(selected);
     setResult(null);
     setStep("idle");
+    clearCachedState();
   }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -178,11 +216,26 @@ export default function InterviewAnalyzer() {
       setStep("generating");
       const questions = await generateQuestionsStep(resumeResult.analysis);
 
-      setResult({
+      const workflowResult = {
         fileName: resumeResult.fileName,
         analysis: resumeResult.analysis,
         questions,
+      };
+
+      setResult(workflowResult);
+      setCachedFileName(resumeResult.fileName);
+      setCachedFileSize(file.size);
+      setCachedAt(new Date().toISOString());
+
+      saveWorkflowCache({
+        fileName: resumeResult.fileName,
+        fileSize: file.size,
+        analysis: resumeResult.analysis,
+        questions,
       });
+      saveInterviewQuestions(questions);
+      clearInterviewSessionCache();
+
       setStep("done");
     } catch (err) {
       setStep("idle");
@@ -255,14 +308,23 @@ export default function InterviewAnalyzer() {
             </p>
           </div>
 
-          {file && (
+          {(file || cachedFileName) && (
             <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/60">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {file.name}
+                  {file?.name ?? cachedFileName}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {formatFileSize(file.size)}
+                  {file
+                    ? formatFileSize(file.size)
+                    : cachedFileSize
+                      ? formatFileSize(cachedFileSize)
+                      : "来自缓存"}
+                  {cachedAt && !file && (
+                    <span className="ml-2">
+                      · 缓存于 {formatCachedTime(cachedAt)}
+                    </span>
+                  )}
                 </p>
               </div>
               {!loading && (
@@ -273,13 +335,20 @@ export default function InterviewAnalyzer() {
                     setResult(null);
                     setStep("idle");
                     setError("");
+                    clearCachedState();
                   }}
                   className="shrink-0 text-xs text-slate-500 transition hover:text-slate-800 dark:hover:text-slate-200"
                 >
-                  移除
+                  清除
                 </button>
               )}
             </div>
+          )}
+
+          {result && !file && cachedAt && (
+            <p className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
+              已恢复上次分析结果。如需重新分析，请重新上传 PDF。
+            </p>
           )}
 
           <button

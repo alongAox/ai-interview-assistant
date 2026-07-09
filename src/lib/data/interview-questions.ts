@@ -1,3 +1,8 @@
+import {
+  getWorkflowCache,
+  saveWorkflowCache,
+} from "@/lib/cache/analysis-cache";
+
 export const SAMPLE_INTERVIEW_QUESTIONS = [
   "请介绍一下你最近负责的一个项目，以及你在其中的核心职责。",
   "项目中遇到的最大技术挑战是什么？你是如何解决的？",
@@ -11,9 +16,15 @@ export const SAMPLE_INTERVIEW_QUESTIONS = [
   "为什么选择这个岗位？你认为自己最大的优势是什么？",
 ];
 
+/** @deprecated 保留兼容，请使用 workflow cache */
 export const INTERVIEW_QUESTIONS_KEY = "interview-questions";
 
 export function getInterviewQuestions(): string[] {
+  const workflow = getWorkflowCache();
+  if (workflow?.questions.length) {
+    return workflow.questions;
+  }
+
   if (typeof window === "undefined") {
     return SAMPLE_INTERVIEW_QUESTIONS;
   }
@@ -29,12 +40,17 @@ export function getInterviewQuestions(): string[] {
       return parsed;
     }
   } catch {
-    // fall through to sample questions
+    // fall through
   }
 
   return SAMPLE_INTERVIEW_QUESTIONS;
 }
 
 export function saveInterviewQuestions(questions: string[]) {
+  const workflow = getWorkflowCache();
+  if (workflow) {
+    saveWorkflowCache({ ...workflow, questions });
+  }
+
   sessionStorage.setItem(INTERVIEW_QUESTIONS_KEY, JSON.stringify(questions));
 }
