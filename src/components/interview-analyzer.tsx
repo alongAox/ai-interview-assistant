@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
+import { saveInterviewQuestions } from "@/lib/data/interview-questions";
 import {
   ANALYSIS_SECTIONS,
   type ResumeAnalysisFields,
@@ -396,6 +398,13 @@ export default function InterviewAnalyzer() {
                   </li>
                 ))}
               </ol>
+              <Link
+                href="/interview"
+                onClick={() => saveInterviewQuestions(result.questions)}
+                className="mt-4 inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-6 text-sm font-semibold text-white transition hover:bg-indigo-500"
+              >
+                开始面试
+              </Link>
             </div>
           </div>
         )}
