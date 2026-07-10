@@ -218,8 +218,20 @@ export default function InterviewReport({
   items = [],
   maxScore = 10,
 }: InterviewReportProps) {
-  const level = getScoreLevel(report.overallScore, maxScore);
-  const answeredCount = items.filter((item) => item.answer.trim()).length;
+  const overallScore =
+    typeof report.overallScore === "number" && !Number.isNaN(report.overallScore)
+      ? report.overallScore
+      : 0;
+  const safeReport = {
+    overallScore,
+    summary: report.summary?.trim() || "暂无总结",
+    strengths: report.strengths?.trim() || "暂无数据",
+    weaknesses: report.weaknesses?.trim() || "暂无数据",
+    suggestions: report.suggestions?.trim() || "暂无数据",
+  };
+  const safeItems = Array.isArray(items) ? items : [];
+  const level = getScoreLevel(safeReport.overallScore, maxScore);
+  const answeredCount = safeItems.filter((item) => item.answer?.trim()).length;
 
   return (
     <article
@@ -229,7 +241,7 @@ export default function InterviewReport({
       <header className="border-b border-slate-200/80 bg-gradient-to-br from-indigo-50 via-white to-sky-50 px-6 py-7 dark:border-slate-800 dark:from-indigo-500/10 dark:via-slate-900 dark:to-sky-500/5 sm:px-8 sm:py-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
           <ScoreRing
-            score={report.overallScore}
+            score={safeReport.overallScore}
             maxScore={maxScore}
             size={112}
           />
@@ -248,10 +260,10 @@ export default function InterviewReport({
               >
                 综合 {level.label}
               </span>
-              {items.length > 0 && (
+              {safeItems.length > 0 && (
                 <>
                   <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    共 {items.length} 题
+                    共 {safeItems.length} 题
                   </span>
                   <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     已作答 {answeredCount} 题
@@ -263,9 +275,9 @@ export default function InterviewReport({
         </div>
       </header>
 
-      <OverallSection report={report} />
+      <OverallSection report={safeReport} />
 
-      {items.length > 0 && (
+      {safeItems.length > 0 && (
         <div className="p-5 sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
@@ -275,7 +287,7 @@ export default function InterviewReport({
           </div>
 
           <div className="space-y-2.5">
-            {items.map((item, index) => (
+            {safeItems.map((item, index) => (
               <QuestionReview
                 key={`${item.index}-${item.question}`}
                 item={item}

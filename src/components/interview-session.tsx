@@ -4,14 +4,23 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import InterviewReport from "@/components/InterviewReport";
 import {
-  clearInterviewSessionCache,
+  CACHE_SCOPE_CHANGED_EVENT,
   formatCachedTime,
   getInterviewSessionCache,
   saveInterviewSessionCache,
 } from "@/lib/cache/analysis-cache";
-import { getInterviewQuestions } from "@/lib/data/interview-questions";
-import { buildInterviewReport } from "@/lib/report/build-report";
-import type { InterviewScoreResult, ScoredInterviewItem } from "@/lib/types/score";
+import {
+  getInterviewQuestions,
+  getTargetedInterviewContext,
+  hasTargetedInterviewQuestions,
+} from "@/lib/data/interview-questions";
+import InterviewPrerequisite from "@/components/InterviewPrerequisite";
+import {
+  generateInterviewReport,
+  rebuildInterviewReport,
+} from "@/lib/report/generate-report";
+import type { InterviewReportData } from "@/lib/types/report";
+import type { ScoredInterviewItem } from "@/lib/types/score";
 
 type ScoringState = "idle" | "loading" | "done" | "error";
 
@@ -22,14 +31,20 @@ export default function InterviewSession() {
   const [answers, setAnswers] = useState<string[]>([]);
   const [completed, setCompleted] = useState(false);
   const [scoringState, setScoringState] = useState<ScoringState>("idle");
-  const [scoreError, setScoreError] = useState("");
+  const [reportError, setReportError] = useState("");
   const [averageScore, setAverageScore] = useState<number | null>(null);
   const [scoredItems, setScoredItems] = useState<ScoredInterviewItem[]>([]);
+  const [report, setReport] = useState<InterviewReportData | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [sessionCachedAt, setSessionCachedAt] = useState<string | null>(null);
+  const [resumeFileName, setResumeFileName] = useState<string | null>(null);
+  const [interviewReady, setInterviewReady] = useState(false);
 
-  useEffect(() => {
-    const questionList = getInterviewQuestions();
+  function restoreSessionCache(questionList: string[]) {
+    const context = getTargetedInterviewContext();
+    const ready = questionList.length > 0 && Boolean(context);
+    setInterviewReady(ready);
+    setResumeFileName(context?.fileName ?? null);
     setQuestions(questionList);
 
     const cache = getInterviewSessionCache();
@@ -38,18 +53,66 @@ export default function InterviewSession() {
       cache.questions.length === questionList.length &&
       cache.questions.every((item, index) => item === questionList[index]);
 
-    if (isSameQuestions && cache) {
-      setAnswers(cache.answers);
-      setCurrentIndex(cache.currentIndex);
-      setAnswer(cache.answers[cache.currentIndex] ?? "");
-      setCompleted(cache.completed);
-      setScoringState(cache.scoringState);
-      setAverageScore(cache.averageScore);
-      setScoredItems(cache.scoredItems);
-      setSessionCachedAt(cache.cachedAt);
+    if (!isSameQuestions || !cache) {
+      setAnswers([]);
+      setCurrentIndex(0);
+      setAnswer("");
+      setCompleted(false);
+      setScoringState("idle");
+      setReportError("");
+      setAverageScore(null);
+      setScoredItems([]);
+      setReport(null);
+      setSessionCachedAt(null);
+      return;
     }
 
+    setAnswers(cache.answers);
+    setCurrentIndex(cache.currentIndex);
+    setAnswer(cache.answers[cache.currentIndex] ?? "");
+    setCompleted(cache.completed);
+    setScoringState(cache.scoringState);
+    setAverageScore(cache.averageScore);
+    setScoredItems(cache.scoredItems);
+    setSessionCachedAt(cache.cachedAt);
+    setReportError("");
+    setReport(null);
+
+    if (
+      cache.scoringState === "done" &&
+      cache.averageScore !== null &&
+      cache.scoredItems.length > 0
+    ) {
+      const restored = rebuildInterviewReport(
+        cache.averageScore,
+        cache.scoredItems,
+      );
+
+      if (restored.ok) {
+        setReport(restored.data.report);
+      } else {
+        setScoringState("error");
+        setReportError(restored.error);
+      }
+    }
+  }
+
+  useEffect(() => {
+    const questionList = getInterviewQuestions();
+    restoreSessionCache(questionList);
     setHydrated(true);
+
+    function handleCacheScopeChanged() {
+      restoreSessionCache(getInterviewQuestions());
+    }
+
+    window.addEventListener(CACHE_SCOPE_CHANGED_EVENT, handleCacheScopeChanged);
+    return () => {
+      window.removeEventListener(
+        CACHE_SCOPE_CHANGED_EVENT,
+        handleCacheScopeChanged,
+      );
+    };
   }, []);
 
   function getPersistedAnswers(nextAnswer = answer) {
@@ -97,9 +160,48 @@ export default function InterviewSession() {
 
   function resetScores() {
     setScoringState("idle");
-    setScoreError("");
+    setReportError("");
     setAverageScore(null);
     setScoredItems([]);
+    setReport(null);
+  }
+
+  async function submitReport(
+    finalAnswers: string[],
+    questionList: string[],
+  ) {
+    const allItems = questionList.map((question, index) => ({
+      question,
+      answer: finalAnswers[index] ?? "",
+      index,
+    }));
+
+    setScoringState("loading");
+    setReportError("");
+    setReport(null);
+
+    const result = await generateInterviewReport(allItems);
+
+    if (result.ok) {
+      setReport(result.data.report);
+      setScoredItems(result.data.items);
+      setAverageScore(result.data.averageScore);
+      setScoringState("done");
+      return;
+    }
+
+    setScoringState("error");
+    setReportError(result.error);
+    setAverageScore(null);
+    setScoredItems([]);
+    setReport(null);
+  }
+
+  function handlePrevious() {
+    if (isFirstQuestion) {
+      return;
+    }
+    saveAndGoTo(currentIndex - 1);
   }
 
   function saveAndGoTo(index: number) {
@@ -115,70 +217,13 @@ export default function InterviewSession() {
     setAnswer(nextAnswers[index] ?? "");
   }
 
-  async function submitScores(
-    finalAnswers: string[],
-    questionList: string[],
-  ) {
-    const allItems = questionList.map((question, index) => ({
-      question,
-      answer: finalAnswers[index] ?? "",
-      index,
-    }));
-
-    setScoringState("loading");
-    setScoreError("");
-
-    try {
-      const response = await fetch("/api/analyze/score", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: allItems.map(({ question, answer }) => ({ question, answer })),
-        }),
-      });
-
-      const data = (await response.json()) as {
-        scores?: InterviewScoreResult[];
-        averageScore?: number;
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(data.error || "评分失败，请稍后重试");
-      }
-
-      const results: ScoredInterviewItem[] = allItems.map((item, scoreIndex) => ({
-        index: item.index,
-        question: item.question,
-        answer: item.answer,
-        ...data.scores![scoreIndex],
-      }));
-
-      setScoredItems(results);
-      setAverageScore(data.averageScore ?? null);
-      setScoringState("done");
-    } catch (error) {
-      setScoringState("error");
-      setScoreError(
-        error instanceof Error ? error.message : "评分失败，请稍后重试",
-      );
-    }
-  }
-
-  function handlePrevious() {
-    if (isFirstQuestion) {
-      return;
-    }
-    saveAndGoTo(currentIndex - 1);
-  }
-
   async function handleNext() {
     const nextAnswers = persistCurrentAnswer([...answers]);
     setAnswers(nextAnswers);
 
     if (isLastQuestion) {
       setCompleted(true);
-      await submitScores(nextAnswers, questions);
+      await submitReport(nextAnswers, questions);
       return;
     }
 
@@ -188,23 +233,33 @@ export default function InterviewSession() {
     setAnswer(nextAnswers[currentIndex + 1] ?? "");
   }
 
-  if (total === 0) {
+  if (!hydrated) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="text-sm text-slate-500 dark:text-slate-400">加载题目中...</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">加载中...</p>
       </div>
     );
+  }
+
+  if (!interviewReady || !hasTargetedInterviewQuestions()) {
+    return <InterviewPrerequisite />;
   }
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col lg:flex-row">
       <aside className="w-full border-b border-slate-200 bg-white/80 p-6 lg:w-[360px] lg:shrink-0 lg:border-b-0 lg:border-r dark:border-slate-800 dark:bg-slate-900/70">
         <Link
-          href="/"
+          href="/dashboard"
           className="text-sm text-slate-500 transition hover:text-slate-800 dark:hover:text-slate-200"
         >
-          ← 返回首页
+          ← 返回简历分析
         </Link>
+
+        {resumeFileName && (
+          <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400">
+            基于简历 · {resumeFileName}
+          </p>
+        )}
 
         {sessionCachedAt && (
           <p className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
@@ -269,7 +324,7 @@ export default function InterviewSession() {
         <div className="mt-4 flex items-center justify-between gap-4">
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {isScoring
-              ? "正在 AI 评分，请稍候..."
+              ? "正在生成报告，请稍候..."
               : isLastQuestion && !completed
                 ? "已是最后一题"
                 : completed
@@ -293,11 +348,11 @@ export default function InterviewSession() {
               className="inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-8 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isScoring
-                ? "评分中..."
+                ? "生成中..."
                 : isLastQuestion && !completed
-                  ? "完成并评分"
+                  ? "完成并生成报告"
                   : completed && scoringState !== "done"
-                    ? "重新评分"
+                    ? "重新生成报告"
                     : "Next"}
             </button>
           </div>
@@ -314,18 +369,15 @@ export default function InterviewSession() {
           </div>
         )}
 
-        {scoreError && (
+        {reportError && (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-            {scoreError}
+            {reportError}
           </div>
         )}
 
-        {scoringState === "done" && averageScore !== null && (
+        {scoringState === "done" && report && (
           <div className="mt-8">
-            <InterviewReport
-              report={buildInterviewReport(averageScore, scoredItems)}
-              items={scoredItems}
-            />
+            <InterviewReport report={report} items={scoredItems} />
           </div>
         )}
       </section>

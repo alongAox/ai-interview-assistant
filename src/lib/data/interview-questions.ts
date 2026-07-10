@@ -1,56 +1,57 @@
 import {
   getWorkflowCache,
+  isGuestCacheScope,
   saveWorkflowCache,
 } from "@/lib/cache/analysis-cache";
+import type { ResumeAnalysisFields } from "@/lib/types/analysis";
 
-export const SAMPLE_INTERVIEW_QUESTIONS = [
-  "请介绍一下你最近负责的一个项目，以及你在其中的核心职责。",
-  "项目中遇到的最大技术挑战是什么？你是如何解决的？",
-  "你常用的技术栈有哪些？请结合项目说明使用场景。",
-  "如何保证代码质量和可维护性？",
-  "描述一次与团队成员意见不一致的经历，你如何处理？",
-  "你如何评估一个需求的优先级？",
-  "如果线上出现紧急故障，你的排查思路是什么？",
-  "你如何做性能优化？请举一个具体例子。",
-  "未来 1-2 年你的职业规划是什么？",
-  "为什么选择这个岗位？你认为自己最大的优势是什么？",
-];
+export type TargetedInterviewContext = {
+  fileName: string;
+  analysis: ResumeAnalysisFields;
+  questions: string[];
+};
 
-/** @deprecated 保留兼容，请使用 workflow cache */
-export const INTERVIEW_QUESTIONS_KEY = "interview-questions";
-
-export function getInterviewQuestions(): string[] {
+/** 是否已完成简历分析并生成针对性面试题 */
+export function hasTargetedInterviewQuestions() {
   const workflow = getWorkflowCache();
-  if (workflow?.questions.length) {
-    return workflow.questions;
+  return Boolean(
+    workflow?.analysis &&
+      Array.isArray(workflow.questions) &&
+      workflow.questions.length > 0,
+  );
+}
+
+/** 获取基于简历分析的面试上下文，未就绪时返回 null */
+export function getTargetedInterviewContext(): TargetedInterviewContext | null {
+  const workflow = getWorkflowCache();
+
+  if (
+    !workflow?.analysis ||
+    !Array.isArray(workflow.questions) ||
+    workflow.questions.length === 0
+  ) {
+    return null;
   }
 
-  if (typeof window === "undefined") {
-    return SAMPLE_INTERVIEW_QUESTIONS;
-  }
+  return {
+    fileName: workflow.fileName,
+    analysis: workflow.analysis,
+    questions: workflow.questions,
+  };
+}
 
-  try {
-    const stored = sessionStorage.getItem(INTERVIEW_QUESTIONS_KEY);
-    if (!stored) {
-      return SAMPLE_INTERVIEW_QUESTIONS;
-    }
-
-    const parsed = JSON.parse(stored) as string[];
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
-    }
-  } catch {
-    // fall through
-  }
-
-  return SAMPLE_INTERVIEW_QUESTIONS;
+/** 获取针对性面试题；未完成简历分析时返回空数组 */
+export function getInterviewQuestions(): string[] {
+  return getTargetedInterviewContext()?.questions ?? [];
 }
 
 export function saveInterviewQuestions(questions: string[]) {
+  if (isGuestCacheScope()) {
+    return;
+  }
+
   const workflow = getWorkflowCache();
   if (workflow) {
     saveWorkflowCache({ ...workflow, questions });
   }
-
-  sessionStorage.setItem(INTERVIEW_QUESTIONS_KEY, JSON.stringify(questions));
 }

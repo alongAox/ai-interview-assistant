@@ -3,6 +3,18 @@ import type { InterviewReportData } from "@/lib/types/report";
 
 const EMPTY_VALUES = new Set(["", "无", "无明显优点", "暂无明显不足"]);
 
+function normalizeItem(item: ScoredInterviewItem): ScoredInterviewItem {
+  return {
+    index: typeof item.index === "number" ? item.index : 0,
+    question: item.question ?? "",
+    answer: item.answer ?? "",
+    score: typeof item.score === "number" && !Number.isNaN(item.score) ? item.score : 0,
+    strengths: item.strengths ?? "",
+    weaknesses: item.weaknesses ?? "",
+    suggestions: item.suggestions ?? "",
+  };
+}
+
 function collectUniquePoints(
   items: ScoredInterviewItem[],
   field: "strengths" | "weaknesses" | "suggestions",
@@ -12,7 +24,7 @@ function collectUniquePoints(
   const points: string[] = [];
 
   for (const item of items) {
-    const value = item[field].trim();
+    const value = (item[field] ?? "").trim();
     if (EMPTY_VALUES.has(value) || seen.has(value)) {
       continue;
     }
@@ -52,25 +64,43 @@ export function buildInterviewReport(
   overallScore: number,
   items: ScoredInterviewItem[],
 ): InterviewReportData {
-  const answeredCount = items.filter((item) => item.answer.trim()).length;
+  try {
+    if (typeof overallScore !== "number" || Number.isNaN(overallScore)) {
+      throw new Error("综合得分无效");
+    }
 
-  return {
-    overallScore,
-    summary: buildOneLiner(overallScore, answeredCount, items.length),
-    strengths: collectUniquePoints(
-      items,
-      "strengths",
-      "暂无显著优势，建议在后续练习中加强回答的完整性与针对性。",
-    ),
-    weaknesses: collectUniquePoints(
-      items,
-      "weaknesses",
-      "暂无明显不足记录，可继续挑战更高难度的题目。",
-    ),
-    suggestions: collectUniquePoints(
-      items,
-      "suggestions",
-      "建议结合每道题目，补充更具体的技术细节与实践案例，形成结构化表达习惯。",
-    ),
-  };
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error("缺少评分数据");
+    }
+
+    const normalizedItems = items.map(normalizeItem);
+    const answeredCount = normalizedItems.filter((item) =>
+      item.answer.trim(),
+    ).length;
+
+    return {
+      overallScore,
+      summary: buildOneLiner(overallScore, answeredCount, normalizedItems.length),
+      strengths: collectUniquePoints(
+        normalizedItems,
+        "strengths",
+        "暂无显著优势，建议在后续练习中加强回答的完整性与针对性。",
+      ),
+      weaknesses: collectUniquePoints(
+        normalizedItems,
+        "weaknesses",
+        "暂无明显不足记录，可继续挑战更高难度的题目。",
+      ),
+      suggestions: collectUniquePoints(
+        normalizedItems,
+        "suggestions",
+        "建议结合每道题目，补充更具体的技术细节与实践案例，形成结构化表达习惯。",
+      ),
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("报告生成失败");
+  }
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
+  CACHE_SCOPE_CHANGED_EVENT,
   clearInterviewSessionCache,
   clearWorkflowCache,
   formatCachedTime,
@@ -105,9 +106,17 @@ export default function InterviewAnalyzer() {
 
   const loading = step === "analyzing" || step === "generating";
 
-  useEffect(() => {
+  function restoreWorkflowCache() {
     const cache = getWorkflowCache();
+
     if (!cache) {
+      setFile(null);
+      setResult(null);
+      setCachedFileName(null);
+      setCachedFileSize(null);
+      setCachedAt(null);
+      setStep("idle");
+      setError("");
       return;
     }
 
@@ -120,7 +129,24 @@ export default function InterviewAnalyzer() {
     setCachedFileSize(cache.fileSize);
     setCachedAt(cache.cachedAt);
     setStep("done");
+    setError("");
     saveInterviewQuestions(cache.questions);
+  }
+
+  useEffect(() => {
+    restoreWorkflowCache();
+
+    function handleCacheScopeChanged() {
+      restoreWorkflowCache();
+    }
+
+    window.addEventListener(CACHE_SCOPE_CHANGED_EVENT, handleCacheScopeChanged);
+    return () => {
+      window.removeEventListener(
+        CACHE_SCOPE_CHANGED_EVENT,
+        handleCacheScopeChanged,
+      );
+    };
   }, []);
 
   function clearCachedState() {
