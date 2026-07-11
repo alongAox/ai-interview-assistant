@@ -54,6 +54,16 @@ export default function UserBar() {
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
             }`}
           >
+            首页
+          </Link>
+          <Link
+            href="/resume"
+            className={`font-medium transition ${
+              pathname === "/resume"
+                ? "text-indigo-600 dark:text-indigo-400"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+            }`}
+          >
             简历分析
           </Link>
           <Link

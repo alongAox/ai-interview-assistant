@@ -37,7 +37,7 @@ export default function InterviewPrerequisite() {
         </ol>
 
         <Link
-          href="/dashboard"
+          href="/resume"
           className="mt-8 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-indigo-600 px-6 text-sm font-semibold text-white transition hover:bg-indigo-500"
         >
           前往简历分析

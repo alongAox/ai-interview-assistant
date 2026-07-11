@@ -64,7 +64,7 @@ export default function LoginPageContent() {
           <p className="text-center text-xs text-slate-400">或免登录直接使用</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Link
-              href="/dashboard"
+              href="/resume"
               onClick={enableGuestMode}
               className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >

@@ -295,7 +295,7 @@ export default function InterviewSession() {
           href="/dashboard"
           className="text-sm text-slate-500 transition hover:text-slate-800 dark:hover:text-slate-200"
         >
-          ← 返回简历分析
+          ← 返回首页
         </Link>
 
         {resumeFileName && (

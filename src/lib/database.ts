@@ -16,13 +16,33 @@ export type SaveInterviewReportResult =
   | SaveInterviewReportSuccess
   | { ok: false; error: string };
 
+/** 单条面试报告记录 */
+export type InterviewReportRecord = {
+  id: string;
+  userId: string;
+  report: InterviewReportData;
+  createdAt: string;
+};
+
+/** 查询面试报告列表的返回类型 */
+export type FetchInterviewReportsResult =
+  | { ok: true; items: InterviewReportRecord[] }
+  | { ok: false; error: string };
+
 type InterviewReportRow = {
+  id: string;
   user_id: string;
   report: InterviewReportData;
   created_at: string;
 };
 
-function formatSaveError(error: unknown): string {
+type InterviewReportInsertRow = {
+  user_id: string;
+  report: InterviewReportData;
+  created_at: string;
+};
+
+function formatDatabaseError(error: unknown, fallback: string): string {
   if (error && typeof error === "object") {
     const record = error as {
       message?: string;
@@ -47,7 +67,11 @@ function formatSaveError(error: unknown): string {
     return error.message;
   }
 
-  return "保存面试报告失败，请稍后重试";
+  return fallback;
+}
+
+function formatSaveError(error: unknown): string {
+  return formatDatabaseError(error, "保存面试报告失败，请稍后重试");
 }
 
 /** 服务端 Admin Client，用于绕过 RLS 写入（仅在 API Route 中使用） */
@@ -100,7 +124,7 @@ export async function saveInterviewReport(
 
     const createdAt = new Date().toISOString();
 
-    const row: InterviewReportRow = {
+    const row: InterviewReportInsertRow = {
       user_id: userId,
       report,
       created_at: createdAt,
@@ -130,6 +154,54 @@ export async function saveInterviewReport(
     return {
       ok: false,
       error: formatSaveError(error),
+    };
+  }
+}
+
+/**
+ * 查询指定用户的面试报告列表，按 created_at 倒序。
+ * 服务端通过 Admin Client 读取，避免客户端 RLS 导致查不到数据。
+ */
+export async function fetchInterviewReports(
+  userId: string,
+  client: SupabaseClient,
+  limit?: number,
+): Promise<FetchInterviewReportsResult> {
+  try {
+    if (!userId.trim()) {
+      throw new Error("缺少 userId");
+    }
+
+    let query = client
+      .from("interview_reports")
+      .select("id, user_id, report, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (limit !== undefined) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    const items: InterviewReportRecord[] = (data ?? []).map(
+      (row: InterviewReportRow) => ({
+        id: row.id,
+        userId: row.user_id,
+        report: row.report,
+        createdAt: row.created_at,
+      }),
+    );
+
+    return { ok: true, items };
+  } catch (error) {
+    return {
+      ok: false,
+      error: formatDatabaseError(error, "获取面试历史失败，请稍后重试"),
     };
   }
 }
