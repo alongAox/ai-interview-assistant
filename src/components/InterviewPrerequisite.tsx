@@ -12,8 +12,7 @@ export default function InterviewPrerequisite() {
           请先完成简历分析
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">
-          模拟面试需要根据您上传的简历生成针对性问题。请先上传 PDF
-          简历并完成 AI 分析，再开始面试。
+          模拟面试需要根据您上传的简历生成针对性问题。请先完成简历分析，再单独生成面试题后开始面试。
         </p>
 
         <ol className="mt-6 space-y-2 text-left text-sm text-slate-600 dark:text-slate-400">
@@ -21,13 +20,13 @@ export default function InterviewPrerequisite() {
             <span className="font-semibold text-indigo-600 dark:text-indigo-400">
               1.
             </span>
-            上传 PDF 简历
+            上传 PDF 简历并完成 AI 分析
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-indigo-600 dark:text-indigo-400">
               2.
             </span>
-            等待 AI 分析并生成 10 道针对性面试题
+            点击「生成面试题」获取 10 道针对性问题
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-indigo-600 dark:text-indigo-400">

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { disableGuestMode, isGuestMode } from "@/lib/auth/guest-mode";
 import { supabase } from "@/lib/supabase";
@@ -9,9 +8,12 @@ type AuthGuardProps = {
   children: React.ReactNode;
 };
 
+function redirectToLogin() {
+  window.location.replace("/");
+}
+
 /** 已登录或访客模式可访问；否则重定向登录页 */
 export default function AuthGuard({ children }: AuthGuardProps) {
-  const router = useRouter();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
         return;
       }
 
-      router.replace("/");
+      redirectToLogin();
     }
 
     verifyAccess();
@@ -53,8 +55,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
 
       if (event === "SIGNED_OUT") {
         disableGuestMode();
-        setReady(false);
-        router.replace("/");
+        redirectToLogin();
         return;
       }
 
@@ -63,15 +64,14 @@ export default function AuthGuard({ children }: AuthGuardProps) {
         return;
       }
 
-      setReady(false);
-      router.replace("/");
+      redirectToLogin();
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, []);
 
   if (!ready) {
     return (

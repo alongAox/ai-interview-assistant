@@ -18,7 +18,12 @@ import {
 } from "@/lib/types/analysis";
 import type { WorkflowResult } from "@/lib/types/interview";
 
-type Step = "idle" | "analyzing" | "generating" | "done";
+type Step =
+  | "idle"
+  | "analyzing"
+  | "analysisDone"
+  | "generating"
+  | "done";
 
 const WORKFLOW_STEPS = [
   { id: "analyze", label: "分析简历", description: "提取经历与能力画像" },
@@ -26,14 +31,19 @@ const WORKFLOW_STEPS = [
 ] as const;
 
 function StepIndicator({ step }: { step: Step }) {
-  const currentIndex =
-    step === "analyzing" ? 0 : step === "generating" || step === "done" ? 1 : -1;
+  const analysisComplete =
+    step === "analysisDone" || step === "generating" || step === "done";
+  const questionsComplete = step === "done";
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {WORKFLOW_STEPS.map((item, index) => {
-        const isActive = currentIndex === index;
-        const isDone = currentIndex > index || step === "done";
+        const isActive =
+          (index === 0 && step === "analyzing") ||
+          (index === 1 && step === "generating");
+        const isDone =
+          (index === 0 && analysisComplete) ||
+          (index === 1 && questionsComplete);
 
         return (
           <div
@@ -120,6 +130,9 @@ export default function InterviewAnalyzer() {
       return;
     }
 
+    const hasQuestions =
+      Array.isArray(cache.questions) && cache.questions.length > 0;
+
     setResult({
       fileName: cache.fileName,
       analysis: cache.analysis,
@@ -128,9 +141,12 @@ export default function InterviewAnalyzer() {
     setCachedFileName(cache.fileName);
     setCachedFileSize(cache.fileSize);
     setCachedAt(cache.cachedAt);
-    setStep("done");
+    setStep(hasQuestions ? "done" : "analysisDone");
     setError("");
-    saveInterviewQuestions(cache.questions);
+
+    if (hasQuestions) {
+      saveInterviewQuestions(cache.questions);
+    }
   }
 
   useEffect(() => {
@@ -239,13 +255,10 @@ export default function InterviewAnalyzer() {
       setStep("analyzing");
       const resumeResult = await analyzeResumeStep(file);
 
-      setStep("generating");
-      const questions = await generateQuestionsStep(resumeResult.analysis);
-
       const workflowResult = {
         fileName: resumeResult.fileName,
         analysis: resumeResult.analysis,
-        questions,
+        questions: [] as string[],
       };
 
       setResult(workflowResult);
@@ -257,6 +270,40 @@ export default function InterviewAnalyzer() {
         fileName: resumeResult.fileName,
         fileSize: file.size,
         analysis: resumeResult.analysis,
+        questions: [],
+      });
+      clearInterviewSessionCache();
+
+      setStep("analysisDone");
+    } catch (err) {
+      setStep("idle");
+      setError(err instanceof Error ? err.message : "处理失败，请稍后重试");
+    }
+  }
+
+  async function handleGenerateQuestions() {
+    if (!result?.analysis) {
+      setError("请先完成简历分析");
+      return;
+    }
+
+    setError("");
+
+    try {
+      setStep("generating");
+      const questions = await generateQuestionsStep(result.analysis);
+
+      const workflowResult = {
+        ...result,
+        questions,
+      };
+
+      setResult(workflowResult);
+
+      saveWorkflowCache({
+        fileName: result.fileName,
+        fileSize: file?.size ?? cachedFileSize ?? 0,
+        analysis: result.analysis,
         questions,
       });
       saveInterviewQuestions(questions);
@@ -264,7 +311,7 @@ export default function InterviewAnalyzer() {
 
       setStep("done");
     } catch (err) {
-      setStep("idle");
+      setStep("analysisDone");
       setError(err instanceof Error ? err.message : "处理失败，请稍后重试");
     }
   }
@@ -286,8 +333,8 @@ export default function InterviewAnalyzer() {
           AI Interview Assistant
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-slate-600 sm:text-base dark:text-slate-400">
-          上传 PDF 简历，系统将先完成 HR 视角分析，再基于分析结果生成 10
-          道针对性面试题。
+          上传 PDF 简历并完成 AI 分析后，可单独生成 10
+          道针对性面试题，再进入模拟面试。
         </p>
       </header>
 
@@ -380,14 +427,10 @@ export default function InterviewAnalyzer() {
           <button
             type="button"
             onClick={handleAnalyze}
-            disabled={loading || !file}
+            disabled={loading || !file || step === "analysisDone" || step === "done"}
             className="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-indigo-600 px-6 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
           >
-            {loading
-              ? step === "analyzing"
-                ? "第一步：正在分析简历..."
-                : "第二步：正在生成面试题..."
-              : "开始分析"}
+            {step === "analyzing" ? "正在分析简历..." : "开始分析"}
           </button>
 
           {error && (
@@ -405,7 +448,7 @@ export default function InterviewAnalyzer() {
           </h2>
           {result && (
             <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-              已完成
+              {result.questions.length > 0 ? "已完成" : "分析完成"}
             </span>
           )}
         </div>
@@ -413,7 +456,7 @@ export default function InterviewAnalyzer() {
         {!result && !loading && (
           <div className="mt-6 rounded-2xl border border-dashed border-slate-200 px-6 py-10 text-center dark:border-slate-800">
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              结果将在这里展示，包括简历分析与 10 道面试题。
+              简历分析结果将在这里展示；完成分析后可单独生成面试题。
             </p>
           </div>
         )}
@@ -474,32 +517,69 @@ export default function InterviewAnalyzer() {
                 <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
                   针对性面试题
                 </h3>
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  {result.questions.length} 道
-                </span>
+                {result.questions.length > 0 && (
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    {result.questions.length} 道
+                  </span>
+                )}
               </div>
-              <ol className="space-y-3">
-                {result.questions.map((question, index) => (
-                  <li
-                    key={`${index}-${question}`}
-                    className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950/40"
+
+              {result.questions.length === 0 && step !== "generating" && (
+                <div className="rounded-2xl border border-dashed border-slate-200 px-6 py-8 text-center dark:border-slate-800">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    简历分析已完成。点击下方按钮，基于分析结果生成 10 道针对性面试题。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleGenerateQuestions}
+                    disabled={loading}
+                    className="mt-4 inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-6 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
                   >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
-                      {index + 1}
-                    </span>
-                    <p className="text-sm leading-6 text-slate-700 dark:text-slate-300">
-                      {question}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-              <Link
-                href="/interview"
-                onClick={() => saveInterviewQuestions(result.questions)}
-                className="mt-4 inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-6 text-sm font-semibold text-white transition hover:bg-indigo-500"
-              >
-                开始面试
-              </Link>
+                    生成面试题
+                  </button>
+                </div>
+              )}
+
+              {step === "generating" && result.questions.length === 0 && (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((item) => (
+                    <div
+                      key={item}
+                      className="h-16 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800"
+                    />
+                  ))}
+                  <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+                    正在生成面试题...
+                  </p>
+                </div>
+              )}
+
+              {result.questions.length > 0 && (
+                <>
+                  <ol className="space-y-3">
+                    {result.questions.map((question, index) => (
+                      <li
+                        key={`${index}-${question}`}
+                        className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950/40"
+                      >
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                          {index + 1}
+                        </span>
+                        <p className="text-sm leading-6 text-slate-700 dark:text-slate-300">
+                          {question}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                  <Link
+                    href="/interview"
+                    onClick={() => saveInterviewQuestions(result.questions)}
+                    className="mt-4 inline-flex h-11 items-center justify-center rounded-2xl bg-indigo-600 px-6 text-sm font-semibold text-white transition hover:bg-indigo-500"
+                  >
+                    开始面试
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

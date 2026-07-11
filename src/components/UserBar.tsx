@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { disableGuestMode } from "@/lib/auth/guest-mode";
 import { supabase } from "@/lib/supabase";
 
 /** 顶部用户栏：导航、登录/退出 */
 export default function UserBar() {
-  const router = useRouter();
   const pathname = usePathname();
   const [email, setEmail] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
@@ -37,8 +36,7 @@ export default function UserBar() {
       }
 
       disableGuestMode();
-      router.replace("/");
-      router.refresh();
+      window.location.replace("/");
     } catch {
       setSigningOut(false);
     }

@@ -15,12 +15,14 @@ import {
   hasTargetedInterviewQuestions,
 } from "@/lib/data/interview-questions";
 import InterviewPrerequisite from "@/components/InterviewPrerequisite";
+import { isGuestMode } from "@/lib/auth/guest-mode";
 import {
   generateInterviewReport,
   rebuildInterviewReport,
 } from "@/lib/report/generate-report";
 import type { InterviewReportData } from "@/lib/types/report";
 import type { ScoredInterviewItem } from "@/lib/types/score";
+import { supabase } from "@/lib/supabase";
 
 type ScoringState = "idle" | "loading" | "done" | "error";
 
@@ -32,6 +34,7 @@ export default function InterviewSession() {
   const [completed, setCompleted] = useState(false);
   const [scoringState, setScoringState] = useState<ScoringState>("idle");
   const [reportError, setReportError] = useState("");
+  const [reportSaveMessage, setReportSaveMessage] = useState("");
   const [averageScore, setAverageScore] = useState<number | null>(null);
   const [scoredItems, setScoredItems] = useState<ScoredInterviewItem[]>([]);
   const [report, setReport] = useState<InterviewReportData | null>(null);
@@ -161,9 +164,47 @@ export default function InterviewSession() {
   function resetScores() {
     setScoringState("idle");
     setReportError("");
+    setReportSaveMessage("");
     setAverageScore(null);
     setScoredItems([]);
     setReport(null);
+  }
+
+  async function persistReportToDatabase(reportData: InterviewReportData) {
+    if (isGuestMode()) {
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      setReportSaveMessage("未登录，报告仅保存在本地。");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/reports", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ report: reportData }),
+      });
+
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        setReportSaveMessage(`云端保存失败：${data.error || "请稍后重试"}`);
+        return;
+      }
+
+      setReportSaveMessage("报告已保存到您的账号。");
+    } catch {
+      setReportSaveMessage("云端保存失败：网络异常，请稍后重试");
+    }
   }
 
   async function submitReport(
@@ -178,6 +219,7 @@ export default function InterviewSession() {
 
     setScoringState("loading");
     setReportError("");
+    setReportSaveMessage("");
     setReport(null);
 
     const result = await generateInterviewReport(allItems);
@@ -187,6 +229,7 @@ export default function InterviewSession() {
       setScoredItems(result.data.items);
       setAverageScore(result.data.averageScore);
       setScoringState("done");
+      await persistReportToDatabase(result.data.report);
       return;
     }
 
@@ -372,6 +415,18 @@ export default function InterviewSession() {
         {reportError && (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
             {reportError}
+          </div>
+        )}
+
+        {reportSaveMessage && (
+          <div
+            className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
+              reportSaveMessage.startsWith("报告已保存")
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+            }`}
+          >
+            {reportSaveMessage}
           </div>
         )}
 
