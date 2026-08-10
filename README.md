@@ -455,9 +455,6 @@ GitHub:
 
 https://github.com/alongAox
 
-# 在线演示
-
-
 # 项目截图
 dashboard<img width="2559" height="1398" alt="497294e55db5e5fd477c5d2d3dc93d45" src="https://github.com/user-attachments/assets/79d53618-e344-4df6-bc4f-03be2934ad97" />
 resume<img width="2559" height="1398" alt="f512ac0a60ce6239b6c76c6a211beca6" src="https://github.com/user-attachments/assets/955337b2-3784-4d6d-bf57-b89c2ea77df6" />
