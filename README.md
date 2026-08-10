@@ -15,7 +15,7 @@ AI Interview Assistant helps job seekers practice interviews by analyzing resume
 
 ## 🌐 Live Demo
 
-Coming soon
+[Coming soon](https://ai-interview-assistant-gamma-eight.vercel.app/)
 
 ---
 
