@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import CacheUserSync from "@/components/CacheUserSync";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "AI Interview Assistant",
-  description: "AI 驱动的智能面试助手，模拟真实面试场景，提供即时反馈与改进建议",
+  description: "AI 驱动的智能面试助手，分析简历并生成针对性面试题",
 };
 
 export default function RootLayout({
@@ -27,7 +28,10 @@ export default function RootLayout({
       lang="zh-CN"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <CacheUserSync />
+        {children}
+      </body>
     </html>
   );
 }

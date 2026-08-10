@@ -45,3 +45,15 @@ export function createAIClient(): AIClientConfig | null {
 
   return null;
 }
+
+export function requireAIClient(): AIClientConfig {
+  const ai = createAIClient();
+
+  if (!ai) {
+    throw new Error(
+      "未配置 AI API Key，请在 .env.local 中设置 OPENROUTER_API_KEY 或 OPENAI_API_KEY",
+    );
+  }
+
+  return ai;
+}

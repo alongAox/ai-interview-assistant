@@ -1,5 +1,4 @@
-export type ResumeAnalysis = {
-  fileName: string;
+export type ResumeAnalysisFields = {
   workExperience: string;
   techStack: string;
   projectExperience: string;
@@ -8,7 +7,10 @@ export type ResumeAnalysis = {
   recommendedRoles: string;
 };
 
-export type ResumeAnalysisFields = Omit<ResumeAnalysis, "fileName">;
+export type ResumeAnalysisResult = {
+  fileName: string;
+  analysis: ResumeAnalysisFields;
+};
 
 export const ANALYSIS_SECTIONS: {
   key: keyof ResumeAnalysisFields;
