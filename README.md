@@ -1,5 +1,12 @@
 # AI Interview Assistant 🚀
 
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-blue)
+![Supabase](https://img.shields.io/badge/Supabase-green)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-blue)
+![OpenRouter](https://img.shields.io/badge/LLM-OpenRouter-purple)
+![Vercel](https://img.shields.io/badge/Vercel-black)
+
 An AI-powered interview preparation SaaS platform built with Next.js, Supabase, PostgreSQL and Large Language Models.
 
 AI Interview Assistant helps job seekers practice interviews by analyzing resumes, generating personalized interview questions, evaluating answers, and providing AI-powered interview feedback reports.
@@ -447,3 +454,13 @@ Long
 GitHub:
 
 https://github.com/alongAox
+
+# 在线演示
+
+
+# 项目截图
+dashboard<img width="2559" height="1398" alt="497294e55db5e5fd477c5d2d3dc93d45" src="https://github.com/user-attachments/assets/79d53618-e344-4df6-bc4f-03be2934ad97" />
+resume<img width="2559" height="1398" alt="f512ac0a60ce6239b6c76c6a211beca6" src="https://github.com/user-attachments/assets/955337b2-3784-4d6d-bf57-b89c2ea77df6" />
+report<img width="2559" height="1398" alt="791bc829f81234f15da32ea797b094cd" src="https://github.com/user-attachments/assets/f2526869-aa5c-4bf7-87b0-e1eade1412b6" />
+
+
